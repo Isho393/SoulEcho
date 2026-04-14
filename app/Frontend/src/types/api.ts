@@ -97,10 +97,10 @@ export interface TokenBalance {
 export interface TokenPackage {
   id: number
   name: string
-  tokens: number
-  price: number
-  currency?: string
+  token_amount: number
+  price_cents: number
   description?: string
+  popular?: boolean
 }
 
 // Conversations

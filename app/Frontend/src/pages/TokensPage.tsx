@@ -1,9 +1,33 @@
+import { useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { toast } from 'sonner'
 import { useTokens } from '../hooks/useTokens'
 import BalanceCard from '../components/tokens/BalanceCard'
 import PackageCard from '../components/tokens/PackageCard'
+import api from '../lib/api'
 
 export default function TokensPage() {
   const { balance, packages, isLoading } = useTokens()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // Handle Stripe redirect back
+  useEffect(() => {
+    const payment = searchParams.get('payment')
+    const sessionId = searchParams.get('session_id')
+
+    if (payment === 'success' && sessionId) {
+      api.post('/api/v1/payment/verify_payment', { session_id: sessionId })
+        .then((res) => {
+          if (res.data?.tokens_added > 0) {
+            toast.success(`${res.data.tokens_added} tokens ajoutés à votre solde !`)
+          } else {
+            toast.info('Paiement reçu, solde en cours de mise à jour.')
+          }
+        })
+        .catch(() => toast.error('Impossible de vérifier le paiement.'))
+        .finally(() => setSearchParams({}))
+    }
+  }, [])
 
   return (
     <div className="h-full overflow-y-auto p-6 max-w-2xl mx-auto">
