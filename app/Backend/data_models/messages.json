@@ -1,0 +1,42 @@
+{
+    "title": "messages",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "integer",
+            "description": "Primary key, auto-increment"
+        },
+        "user_id": {
+            "type": "string",
+            "description": "User ID"
+        },
+        "conversation_id": {
+            "type": "integer",
+            "description": "Foreign key to conversations"
+        },
+        "role": {
+            "type": "string",
+            "description": "Message role: user or assistant"
+        },
+        "content": {
+            "type": "string",
+            "description": "Message content text"
+        },
+        "tokens_used": {
+            "type": "integer",
+            "description": "Tokens consumed by this message"
+        },
+        "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Created timestamp"
+        }
+    },
+    "required": [
+        "id",
+        "user_id",
+        "conversation_id",
+        "role",
+        "content"
+    ]
+}

@@ -1,0 +1,30 @@
+[
+    {
+        "name": "Starter",
+        "token_amount": 500,
+        "price_cents": 499,
+        "description": "Perfect for trying out SoulEcho",
+        "popular": false
+    },
+    {
+        "name": "Popular",
+        "token_amount": 2000,
+        "price_cents": 1499,
+        "description": "Best value for regular users",
+        "popular": true
+    },
+    {
+        "name": "Pro",
+        "token_amount": 5000,
+        "price_cents": 2999,
+        "description": "For power users and professionals",
+        "popular": false
+    },
+    {
+        "name": "Enterprise",
+        "token_amount": 15000,
+        "price_cents": 6999,
+        "description": "Unlimited potential for teams",
+        "popular": false
+    }
+]

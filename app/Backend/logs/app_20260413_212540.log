@@ -1,0 +1,35 @@
+2026-04-13 21:25:40,970 - main - INFO - === Logging system initialized ===
+2026-04-13 21:25:40,971 - main - INFO - Log file: logs/app_20260413_212540.log
+2026-04-13 21:25:40,971 - main - INFO - Log level: INFO
+2026-04-13 21:25:40,972 - main - INFO - Timestamp: 20260413_212540
+2026-04-13 21:25:43,666 - main - INFO - Included router: routers.aihub.router
+2026-04-13 21:25:43,727 - main - INFO - Included router: routers.auth.router
+2026-04-13 21:25:43,898 - main - INFO - Included router: routers.conversations.router
+2026-04-13 21:25:43,902 - main - INFO - Included router: routers.health.router
+2026-04-13 21:25:44,091 - main - INFO - Included router: routers.messages.router
+2026-04-13 21:25:44,301 - main - INFO - Included router: routers.orders.router
+2026-04-13 21:25:44,404 - core.config - DEBUG - Read dynamic attribute stripe_secret_key from environment variable STRIPE_SECRET_KEY
+2026-04-13 21:25:44,446 - main - INFO - Included router: routers.payments.router
+2026-04-13 21:25:44,530 - main - INFO - Included router: routers.settings.router
+2026-04-13 21:25:44,828 - main - INFO - Included router: routers.storage.router
+2026-04-13 21:25:44,996 - main - INFO - Included router: routers.token_balances.router
+2026-04-13 21:25:45,210 - main - INFO - Included router: routers.token_packages.router
+2026-04-13 21:25:45,236 - main - INFO - Included router: routers.user.router
+2026-04-13 21:25:45,240 - main - INFO - === Application startup initiated ===
+2026-04-13 21:25:45,241 - services.database - DEBUG - [DB_OP] Starting database initialization
+2026-04-13 21:25:45,242 - services.database - INFO - 🔧 Starting database initialization...
+2026-04-13 21:25:45,242 - core.database - INFO - Starting database initialization...
+2026-04-13 21:25:45,242 - core.config - DEBUG - Read dynamic attribute database_url from environment variable DATABASE_URL
+2026-04-13 21:25:45,242 - core.database - INFO - Normalizing database URL for async compatibility...
+2026-04-13 21:25:45,244 - core.database - WARNING - Adjusted database URL driver for async compatibility
+2026-04-13 21:25:45,244 - core.database - INFO - Creating async database engine...
+2026-04-13 21:25:45,245 - core.database - INFO - Using QueuePool with connection pooling for non-Lambda environment
+2026-04-13 21:25:45,489 - core.database - INFO - Database engine created successfully
+2026-04-13 21:25:45,489 - core.database - INFO - Creating async session maker...
+2026-04-13 21:25:45,489 - core.database - INFO - Async session maker created successfully
+2026-04-13 21:25:45,490 - core.database - INFO - Database connection initialized successfully
+2026-04-13 21:25:45,490 - services.database - INFO - 🔧 Database connection initialized, now creating tables if tables not exist...
+2026-04-13 21:25:45,491 - core.database - DEBUG - [DB_OP] Starting create_tables
+2026-04-13 21:25:45,491 - core.database - INFO - 🔧 Starting table creation...
+2026-04-13 21:25:45,881 - core.database - ERROR - Failed to create tables: connection was closed in the middle of operation
+2026-04-13 21:25:45,882 - services.database - ERROR - Failed to initialize database: connection was closed in the middle of operation

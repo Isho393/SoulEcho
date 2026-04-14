@@ -1,0 +1,36 @@
+{
+    "title": "token_packages",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "integer",
+            "description": "Primary key, auto-increment"
+        },
+        "name": {
+            "type": "string",
+            "description": "Package name"
+        },
+        "token_amount": {
+            "type": "integer",
+            "description": "Number of tokens in package"
+        },
+        "price_cents": {
+            "type": "integer",
+            "description": "Price in cents"
+        },
+        "description": {
+            "type": "string",
+            "description": "Package description"
+        },
+        "popular": {
+            "type": "boolean",
+            "description": "Whether this is a popular package"
+        }
+    },
+    "required": [
+        "id",
+        "name",
+        "token_amount",
+        "price_cents"
+    ]
+}

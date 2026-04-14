@@ -1,0 +1,36 @@
+{
+    "title": "token_balances",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "integer",
+            "description": "Primary key, auto-increment"
+        },
+        "user_id": {
+            "type": "string",
+            "description": "User ID"
+        },
+        "balance": {
+            "type": "integer",
+            "description": "Current token balance"
+        },
+        "total_purchased": {
+            "type": "integer",
+            "description": "Total tokens purchased"
+        },
+        "total_used": {
+            "type": "integer",
+            "description": "Total tokens consumed"
+        },
+        "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Updated timestamp"
+        }
+    },
+    "required": [
+        "id",
+        "user_id",
+        "balance"
+    ]
+}
