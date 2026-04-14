@@ -324,3 +324,34 @@ async def logout():
     """Logout user."""
     logout_url = build_logout_url()
     return {"redirect_url": logout_url}
+
+
+# ─── Dev / Simple auth endpoints (email+password) ───────────────────────────
+
+from pydantic import BaseModel
+
+class SimpleLoginRequest(BaseModel):
+    email: str
+    password: str
+    name: str | None = None
+
+
+@router.post("/login", response_model=TokenExchangeResponse)
+async def simple_login(payload: SimpleLoginRequest, db: AsyncSession = Depends(get_db)):
+    """Simple email/password login for development. Creates user if not exists."""
+    auth_service = AuthService(db)
+    # Use email as the user ID (deterministic)
+    platform_sub = f"local:{payload.email}"
+    user = await auth_service.get_or_create_user(
+        platform_sub=platform_sub,
+        email=payload.email,
+        name=payload.name or derive_name_from_email(payload.email),
+    )
+    app_token, _, _ = await auth_service.issue_app_token(user=user)
+    return TokenExchangeResponse(token=app_token)
+
+
+@router.post("/register", response_model=TokenExchangeResponse)
+async def simple_register(payload: SimpleLoginRequest, db: AsyncSession = Depends(get_db)):
+    """Simple email/password register for development."""
+    return await simple_login(payload, db)

@@ -39,8 +39,12 @@ function ConversationSidebar({
   const { data: conversations = [] } = useQuery<Conversation[]>({
     queryKey: ['conversations'],
     queryFn: async () => {
-      const res = await api.get<Conversation[]>('/api/v1/entities/conversations')
-      return res.data
+      const res = await api.get('/api/v1/entities/conversations')
+      const data = res.data
+      if (!data) return []
+      if (Array.isArray(data)) return data as Conversation[]
+      if (Array.isArray(data.items)) return data.items as Conversation[]
+      return []
     },
     staleTime: 30_000,
   })

@@ -4,8 +4,16 @@
 
 import asyncio
 import importlib
+import os
 import pkgutil
 from logging.config import fileConfig
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load .env so DATABASE_URL is available
+_env_path = Path(__file__).parent.parent / ".env"
+load_dotenv(dotenv_path=_env_path, override=False)
 
 import models
 from alembic import context
@@ -34,7 +42,11 @@ def alembic_include_object(object, name, type_, reflected, compare_to):
 
 
 async def run_migrations_online():
-    connectable = create_async_engine(config.get_main_option("sqlalchemy.url"), poolclass=pool.NullPool)
+    # Use DATABASE_URL from env, converting to async driver
+    db_url = os.environ.get("DATABASE_URL", config.get_main_option("sqlalchemy.url"))
+    if db_url and db_url.startswith("postgresql://"):
+        db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    connectable = create_async_engine(db_url, poolclass=pool.NullPool)
     async with connectable.connect() as connection:
         await connection.run_sync(
             lambda sync_conn: context.configure(
