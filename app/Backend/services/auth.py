@@ -27,6 +27,8 @@ class AuthService:
         user = result.scalar_one_or_none()
         logger.debug(f"[DB_OP] User lookup completed in {time.time() - start_time:.4f}s - found: {user is not None}")
 
+        is_new_user = (user is None)
+
         if user:
             # Update user info if needed
             user.email = email
@@ -42,6 +44,22 @@ class AuthService:
         await self.db.commit()
         await self.db.refresh(user)
         logger.debug(f"[DB_OP] User commit/refresh completed in {time.time() - start_time_commit:.4f}s")
+
+        # Give welcome tokens to new users
+        if is_new_user:
+            from models.token_balances import Token_balances
+            welcome_tokens = 500
+            balance = Token_balances(
+                user_id=platform_sub,
+                balance=welcome_tokens,
+                total_purchased=welcome_tokens,
+                total_used=0,
+                updated_at=datetime.now(timezone.utc),
+            )
+            self.db.add(balance)
+            await self.db.commit()
+            logger.info(f"Granted {welcome_tokens} welcome tokens to new user {platform_sub}")
+
         return user
 
     async def issue_app_token(

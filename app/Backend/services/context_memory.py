@@ -11,8 +11,8 @@ from services.messages import MessagesService
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CONTEXT_WINDOW_SIZE = 20
-DEFAULT_MAX_CONTEXT_TOKENS = 4000
+DEFAULT_CONTEXT_WINDOW_SIZE = 10
+DEFAULT_MAX_CONTEXT_TOKENS = 2000  # historique seul — hors system prompt et message courant
 
 
 def _estimate_tokens(text: str) -> int:
@@ -47,8 +47,17 @@ class ContextMemory:
         # Construire les dicts OpenAI
         history_dicts = [{"role": m.role, "content": m.content} for m in history]
 
-        # Tronquer si la somme des tokens dépasse MAX_CONTEXT_TOKENS
-        history_dicts = self._truncate(history_dicts, max_context_tokens)
+        # Calculer les tokens fixes (system prompt + message courant)
+        fixed_tokens = _estimate_tokens(system_prompt) + _estimate_tokens(current_message)
+        available_for_history = max(0, max_context_tokens - fixed_tokens)
+
+        # Tronquer l'historique dans la fenêtre disponible
+        history_dicts = self._truncate(history_dicts, available_for_history)
+
+        logger.debug(
+            f"[CONTEXT] fixed={fixed_tokens} history={sum(_estimate_tokens(m['content']) for m in history_dicts)} "
+            f"total≈{fixed_tokens + sum(_estimate_tokens(m['content']) for m in history_dicts)}"
+        )
 
         return [{"role": "system", "content": system_prompt}] + history_dicts + [
             {"role": "user", "content": current_message}

@@ -14,5 +14,6 @@ class UserProfile(Base):
     goals = Column(JSON, nullable=True)
     communication_preference = Column(String(20), nullable=True)
     language = Column(String(5), nullable=True, default="fr")
+    ai_memory = Column(String(2000), nullable=True)  # résumé psychologique généré par l'IA
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

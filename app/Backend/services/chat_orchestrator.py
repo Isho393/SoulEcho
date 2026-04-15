@@ -1,13 +1,10 @@
 """
-ChatOrchestrator — orchestre le flux de chat SoulEcho en un seul stream SSE.
-Coordonne : vérification tokens, conversation, mémoire contextuelle, prompt dynamique, IA, persistance.
+ChatOrchestrator — orchestre le flux de chat SoulEcho.
 """
-import json
 import logging
 from datetime import datetime, timezone
 from typing import AsyncGenerator, Optional
 
-from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,8 +19,16 @@ from services.prompt_builder import PromptBuilder
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_AI_MODEL = "deepseek-v3.2"
-ESTIMATED_COST_PER_REQUEST = 100  # tokens estimés minimum requis
+DEFAULT_AI_MODEL = "llama-3.3-70b-versatile"
+ESTIMATED_COST_PER_REQUEST = 10  # seuil minimum pour déclencher une requête
+
+MEMORY_PROMPT = (
+    "En te basant sur cette conversation, génère un résumé psychologique concis (max 300 mots) "
+    "sur cette personne : ses émotions dominantes, ses préoccupations, ses patterns de pensée, "
+    "ce qui semble lui peser, ce qui l'anime. Écris à la 3e personne, de façon factuelle et bienveillante. "
+    "Ce résumé sera utilisé pour personnaliser les prochaines conversations. "
+    "Réponds UNIQUEMENT avec le résumé, sans introduction ni conclusion."
+)
 
 
 class ChatOrchestrator:
@@ -41,6 +46,50 @@ class ChatOrchestrator:
         )
         return result.scalar_one_or_none()
 
+    async def _update_ai_memory(self, user_id: str, conversation_id: int, model: str) -> None:
+        """Génère et sauvegarde un résumé psychologique après la conversation."""
+        try:
+            messages = await self._messages_svc.list_by_field(
+                "conversation_id", conversation_id, skip=0, limit=50
+            )
+            if len(messages) < 3:
+                return  # Pas assez d'échanges pour un résumé utile
+
+            # Construire le contexte de la conversation
+            conv_text = "\n".join(
+                f"{'Utilisateur' if m.role == 'user' else 'SoulEcho'}: {m.content}"
+                for m in messages
+            )
+
+            ai_service = AIHubService()
+            request = GenTxtRequest(
+                messages=[
+                    ChatMessage(role="system", content="Tu es un psychologue bienveillant qui analyse des conversations."),
+                    ChatMessage(role="user", content=f"Conversation :\n{conv_text}\n\n{MEMORY_PROMPT}"),
+                ],
+                model=model,
+                stream=False,
+            )
+            response = await ai_service.gentxt(request)
+            new_memory = response.content.strip()
+
+            if new_memory:
+                profile = await self._profile_svc.get_or_create(user_id)
+                # Enrichir la mémoire existante plutôt que la remplacer
+                existing = getattr(profile, 'ai_memory', None) or ""
+                if existing:
+                    # Garder un historique glissant (max 1500 chars)
+                    combined = f"{existing}\n\n---\n\n{new_memory}"
+                    if len(combined) > 1500:
+                        combined = combined[-1500:]
+                    profile.ai_memory = combined
+                else:
+                    profile.ai_memory = new_memory
+                await self.db.commit()
+                logger.info(f"[MEMORY] Updated ai_memory for user_id={user_id}")
+        except Exception as e:
+            logger.warning(f"[MEMORY] Failed to update ai_memory: {e}")
+
     async def stream(
         self,
         user_id: str,
@@ -48,20 +97,21 @@ class ChatOrchestrator:
         conversation_id: Optional[int] = None,
         model: str = DEFAULT_AI_MODEL,
     ) -> AsyncGenerator[dict, None]:
-        """
-        Génère un stream SSE orchestré.
-        Yields: {"type": "chunk"|"done"|"error", "content": str, "conversation_id": int}
-        """
-        # 1. Vérifier le solde tokens (HTTP 402 si insuffisant)
+
+        # 1. Vérifier le solde tokens
         balance = await self._get_token_balance(user_id)
         if balance is None or balance.balance < ESTIMATED_COST_PER_REQUEST:
-            raise HTTPException(
-                status_code=402,
-                detail="Insufficient token balance. Please purchase more tokens."
-            )
+            yield {
+                "type": "error",
+                "content": "Solde de tokens insuffisant. Rechargez votre compte pour continuer.",
+                "conversation_id": conversation_id,
+                "code": 402,
+            }
+            return
 
         # 2. Créer ou vérifier la conversation
-        if conversation_id is None:
+        is_new_conversation = conversation_id is None
+        if is_new_conversation:
             conv = await self._conversations_svc.create(
                 {"title": message[:50], "created_at": datetime.now(timezone.utc)},
                 user_id=user_id,
@@ -70,10 +120,8 @@ class ChatOrchestrator:
         else:
             conv = await self._conversations_svc.get_by_id(conversation_id, user_id=user_id)
             if conv is None:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Conversation not found or access denied."
-                )
+                yield {"type": "error", "content": "Conversation introuvable.", "conversation_id": conversation_id}
+                return
 
         # 3. Sauvegarder le message utilisateur
         await self._messages_svc.create(
@@ -86,33 +134,32 @@ class ChatOrchestrator:
             user_id=user_id,
         )
 
-        # 4. Construire le prompt système selon le profil
+        # 4. Construire le prompt avec profil + mémoire IA
         profile = await self._profile_svc.get_or_create(user_id)
         system_prompt = self._prompt_builder.build(profile)
 
-        # 5. Récupérer le contexte (historique + prompt système)
+        # 5. Récupérer le contexte conversationnel
         context_messages = await self._context_memory.get_context(
             conversation_id=conversation_id,
             system_prompt=system_prompt,
             current_message=message,
         )
 
-        # 6. Construire la requête IA
+        # 6. Streamer la réponse IA
         ai_messages = [ChatMessage(role=m["role"], content=m["content"]) for m in context_messages]
         request = GenTxtRequest(messages=ai_messages, model=model, stream=True)
-
-        # 7. Streamer la réponse IA
         ai_service = AIHubService()
         full_response = ""
         tokens_deducted = False
+        tokens_used = 0
 
         try:
             async for chunk in ai_service.gentxt_stream(request):
                 full_response += chunk
                 yield {"type": "chunk", "content": chunk, "conversation_id": conversation_id}
 
-            # 8. Sauvegarder la réponse complète de l'IA
-            tokens_used = len(full_response) // 4 + len(message) // 4  # estimation
+            # 7. Sauvegarder la réponse
+            tokens_used = len(full_response) // 4 + len(message) // 4
             await self._messages_svc.create(
                 {
                     "conversation_id": conversation_id,
@@ -124,34 +171,38 @@ class ChatOrchestrator:
                 user_id=user_id,
             )
 
-            # 9. Déduire les tokens
+            # 8. Déduire les tokens
             balance.balance = max(0, balance.balance - tokens_used)
-            if balance.total_used is None:
-                balance.total_used = 0
-            balance.total_used += tokens_used
+            balance.total_used = (balance.total_used or 0) + tokens_used
             balance.updated_at = datetime.now(timezone.utc)
             await self.db.commit()
             tokens_deducted = True
 
-            # Journalisation RGPD (sans contenu des messages)
-            logger.info(
-                f"[CHAT] user_id={user_id} conversation_id={conversation_id} "
-                f"model={model} tokens_used={tokens_used}"
-            )
-
+            logger.info(f"[CHAT] user={user_id} conv={conversation_id} tokens={tokens_used}")
             yield {"type": "done", "content": "", "conversation_id": conversation_id}
 
-        except Exception as e:
-            logger.error(f"[CHAT] Stream error for user_id={user_id}: {e}")
+            # 9. Mettre à jour la mémoire IA en arrière-plan (non-bloquant pour le stream)
+            await self._update_ai_memory(user_id, conversation_id, model)
 
-            # Rollback de la déduction si elle a eu lieu
+        except Exception as e:
+            logger.error(f"[CHAT] Stream error user={user_id}: {e}")
             if tokens_deducted:
                 try:
                     balance.balance += tokens_used
                     balance.total_used = max(0, (balance.total_used or 0) - tokens_used)
                     await self.db.commit()
-                    logger.info(f"[CHAT] Token deduction rolled back for user_id={user_id}")
-                except Exception as rollback_err:
-                    logger.error(f"[CHAT] Rollback failed: {rollback_err}")
+                except Exception as re:
+                    logger.error(f"[CHAT] Rollback failed: {re}")
 
-            yield {"type": "error", "content": str(e), "conversation_id": conversation_id}
+            error_str = str(e)
+            if "429" in error_str or "rate_limit_exceeded" in error_str or "Rate limit" in error_str:
+                user_message = "Je suis là, mais j'ai besoin d'une petite pause. Réessaie dans quelques minutes."
+                code = 429
+            elif "401" in error_str or "authentication" in error_str.lower():
+                user_message = "Un problème technique m'empêche de répondre. L'équipe a été notifiée."
+                code = 503
+            else:
+                user_message = "Quelque chose s'est mal passé de mon côté. Réessaie dans un moment."
+                code = 503
+
+            yield {"type": "error", "content": user_message, "conversation_id": conversation_id, "code": code}

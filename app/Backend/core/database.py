@@ -50,6 +50,12 @@ class DatabaseManager:
         # Already async drivers
         if "+aiosqlite" in drivername or "+asyncpg" in drivername or "+aiomysql" in drivername:
             self._check_db_exist(raw_url)
+            # For asyncpg, ensure SSL is disabled if not explicitly set (Laragon/local PG has no SSL)
+            if "+asyncpg" in drivername:
+                url = make_url(raw_url)
+                if not url.query.get("ssl"):
+                    url = url.update_query_dict({"ssl": "disable"})
+                    return str(url)
             return raw_url
 
         # Map common sync schemes to async equivalents
@@ -58,6 +64,9 @@ class DatabaseManager:
             self._check_db_exist(raw_url)
         elif drivername in ("postgresql", "postgres"):
             url = url.set(drivername="postgresql+asyncpg")
+            # Disable SSL by default for local dev (asyncpg tries SSL first on Windows/Laragon)
+            if not url.query.get("ssl"):
+                url = url.update_query_dict({"ssl": "disable"})
         elif drivername in ("mysql",):
             url = url.set(drivername="mysql+aiomysql")
         elif drivername in ("mariadb",):
