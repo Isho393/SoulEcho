@@ -5,12 +5,12 @@ interface StatsBlockProps {
   stats: EmotionalStats | null
 }
 
-function StatItem({ label, value }: { label: string; value: number | undefined }) {
+function StatItem({ label, value }: { label: string; value: number | null | undefined }) {
   return (
     <div className="bg-navy rounded-lg p-3 text-center">
       <p className="text-cream/40 text-xs mb-1">{label}</p>
       <p className="text-cream text-xl font-semibold">
-        {value !== undefined ? value.toFixed(1) : '—'}
+        {value != null ? value.toFixed(1) : '—'}
       </p>
     </div>
   )

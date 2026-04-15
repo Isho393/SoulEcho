@@ -24,6 +24,9 @@ export function useProfile() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profile'] })
     },
+    onError: () => {
+      // error handled in component via try/catch
+    },
   })
 
   const exportData = async () => {
