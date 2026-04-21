@@ -40,15 +40,7 @@ class AIHubService:
         return {"role": msg.role, "content": content}
 
     async def gentxt(self, request: GenTxtRequest) -> GenTxtResponse:
-        """
-        Generate Text API (non-streaming), supports text and image input.
-
-        Args:
-            request: Generate text request parameters.
-
-        Returns:
-            Txt2TxtResponse: generated text response.
-        """
+        """Generate Text API (non-streaming)."""
         try:
             messages = [self._convert_message(msg) for msg in request.messages]
 
@@ -69,11 +61,7 @@ class AIHubService:
                     "total_tokens": response.usage.total_tokens,
                 }
 
-            return GenTxtResponse(
-                content=content,
-                model=request.model,
-                usage=usage,
-            )
+            return GenTxtResponse(content=content, model=request.model, usage=usage)
 
         except Exception as e:
             logger.error(f"gentxt error: {e}")
@@ -81,17 +69,34 @@ class AIHubService:
 
     async def gentxt_stream(self, request: GenTxtRequest) -> AsyncGenerator[str, None]:
         """
-        Generate Text API (streaming), supports text and image input.
-
-        Args:
-            request: Generate text request parameters.
-
-        Yields:
-            str: Generated text content chunk (plain text, not JSON).
+        Generate Text API (streaming).
+        Route vers Kaggle GPU si disponible, sinon API externe.
         """
+        from services.kaggle_client import is_kaggle_available, KaggleClient
+
+        # ── Kaggle GPU (prioritaire si configuré) ──────────────────────
+        if is_kaggle_available():
+            try:
+                client = KaggleClient()
+                messages = [self._convert_message(msg) for msg in request.messages]
+                # Kaggle n'accepte que du texte (pas multimodal)
+                text_messages = [
+                    {"role": m["role"], "content": m["content"] if isinstance(m["content"], str) else str(m["content"])}
+                    for m in messages
+                ]
+                async for chunk in client.chat_stream(
+                    messages=text_messages,
+                    temperature=request.temperature or 0.7,
+                    max_tokens=request.max_tokens or 1024,
+                ):
+                    yield chunk
+                return
+            except Exception as e:
+                logger.warning(f"[LLM] Kaggle indisponible ({e}), fallback API externe...")
+
+        # ── Fallback : API externe (Groq, OpenAI…) ─────────────────────
         try:
             messages = [self._convert_message(msg) for msg in request.messages]
-
             stream = await self.client.chat.completions.create(
                 model=request.model,
                 messages=messages,
@@ -99,11 +104,9 @@ class AIHubService:
                 max_tokens=request.max_tokens,
                 stream=True,
             )
-
             async for chunk in stream:
                 if chunk.choices and chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
-
         except Exception as e:
             logger.error(f"gentxt_stream error: {e}")
             raise

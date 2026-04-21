@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react'
 import { useChat } from '../hooks/useChat'
 import { useVoiceCall } from '../hooks/useVoiceCall'
 import { useTokens } from '../hooks/useTokens'
+import { useProfile } from '../hooks/useProfile'
 import MessageList from '../components/chat/MessageList'
 import ChatInput from '../components/chat/ChatInput'
 import VoiceCallOverlay from '../components/chat/VoiceCallOverlay'
@@ -139,6 +140,8 @@ export default function ChatPage() {
   const [showGdpr, setShowGdpr] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { balance } = useTokens()
+  const { profile } = useProfile()
+  const userLanguage = profile?.language || 'fr'
 
   const { messages, conversationId, isStreaming, sendMessage, loadConversation, resetConversation } = useChat(
     (text) => { if (callOpenRef.current) speakLastResponse(text) }
@@ -147,6 +150,7 @@ export default function ChatPage() {
   const { isOpen: callOpen, isSupported: voiceSupported, callState, transcript, open: openCall, close: closeCall, speakLastResponse } = useVoiceCall({
     onSendMessage: sendMessage,
     isStreaming,
+    language: userLanguage,
   })
 
   const callOpenRef = useRef(false)
@@ -229,6 +233,7 @@ export default function ChatPage() {
           isStreaming={isStreaming}
           onVoiceCall={voiceSupported ? openCall : undefined}
           tokenBalance={balance?.balance}
+          language={userLanguage}
         />
       </div>
 

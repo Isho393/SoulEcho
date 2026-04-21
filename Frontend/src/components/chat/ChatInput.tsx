@@ -8,17 +8,19 @@ interface ChatInputProps {
   isStreaming: boolean
   onVoiceCall?: () => void
   tokenBalance?: number | null
+  language?: string
 }
 
-export default function ChatInput({ onSend, isStreaming, onVoiceCall, tokenBalance }: ChatInputProps) {
+export default function ChatInput({ onSend, isStreaming, onVoiceCall, tokenBalance, language = 'fr' }: ChatInputProps) {
   const [value, setValue] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const { isListening, isSupported, toggle } = useVoice({
+  const { isListening, isProcessing, isSupported, toggle } = useVoice({
     onResult: (transcript) => {
       setValue((prev) => (prev ? `${prev} ${transcript}` : transcript))
       textareaRef.current?.focus()
     },
+    language,
   })
 
   useEffect(() => {
@@ -92,15 +94,31 @@ export default function ChatInput({ onSend, isStreaming, onVoiceCall, tokenBalan
             className={`p-3 rounded-2xl transition-all shrink-0 ${
               isListening
                 ? 'text-rose-400 ring-1 ring-rose-400/40'
+                : isProcessing
+                ? 'text-violet-light ring-1 ring-violet/40'
                 : 'text-cream/35 hover:text-cream/65'
             } disabled:opacity-40 disabled:cursor-not-allowed`}
-            style={isListening
-              ? { background: 'rgba(244,63,94,0.12)' }
-              : { background: 'rgba(255,255,255,0.04)' }
+            style={
+              isListening
+                ? { background: 'rgba(244,63,94,0.12)' }
+                : isProcessing
+                ? { background: 'rgba(124,58,237,0.12)' }
+                : { background: 'rgba(255,255,255,0.04)' }
             }
-            aria-label={isListening ? "Arrêter l'écoute" : 'Dicter un message'}
+            aria-label={isListening ? "Arrêter l'écoute" : isProcessing ? 'Transcription en cours…' : 'Dicter un message'}
           >
-            {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+            {isListening ? (
+              <MicOff size={18} />
+            ) : isProcessing ? (
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+              >
+                <Mic size={18} />
+              </motion.div>
+            ) : (
+              <Mic size={18} />
+            )}
           </motion.button>
         )}
 
@@ -113,7 +131,7 @@ export default function ChatInput({ onSend, isStreaming, onVoiceCall, tokenBalan
             onKeyDown={handleKeyDown}
             disabled={isStreaming}
             rows={1}
-            placeholder={isListening ? '🎙 En écoute…' : isStreaming ? '' : 'Écrivez votre message…'}
+            placeholder={isListening ? '🎙 En écoute…' : isProcessing ? '⏳ Transcription…' : isStreaming ? '' : 'Écrivez votre message…'}
             className="w-full rounded-2xl px-4 py-3 pr-4 text-cream placeholder-cream/22 focus:outline-none resize-none text-sm disabled:opacity-60 transition-all input-glow"
             style={{
               minHeight: '48px',

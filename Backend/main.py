@@ -22,6 +22,8 @@ from fastapi.routing import APIRouter
 from services.database import initialize_database, close_database
 from services.mock_data import initialize_mock_data
 from services.auth import initialize_admin_user
+from services.stt_service import preload_model as preload_stt
+from services.tts_service import preload_model as preload_tts
 # MODULE_IMPORTS_END
 
 
@@ -75,6 +77,10 @@ async def lifespan(app: FastAPI):
     await initialize_database()
     await initialize_mock_data()
     await initialize_admin_user()
+    # Pré-charger les modèles audio en arrière-plan (non-bloquant)
+    import asyncio as _asyncio
+    _asyncio.get_event_loop().run_in_executor(None, preload_stt)
+    _asyncio.get_event_loop().run_in_executor(None, lambda: preload_tts("fr"))
     # MODULE_STARTUP_END
 
     logger.info("=== Application startup completed successfully ===")
